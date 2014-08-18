@@ -1,0 +1,218 @@
+
+-- WARNING: installing this and accelerate-backend-kit will collide! 
+--          ITs using the same namespace (USE A SANDBOX) 
+Name:                experimental-backend-kit
+Version:             0.15.0.4
+Synopsis:            Simplified AST for Accelerate that makes it easy to build new backends.
+
+-- Description:         
+
+Homepage:            https://github.com/AccelerateHS/accelerate-backend-kit/
+License:             BSD3
+License-file:        LICENSE
+Author:              Ryan R. Newton
+Maintainer:          rrnewton@gmail.com
+
+Category:            Language
+
+Build-type:          Simple
+
+-- Extra files to be distributed with the package, such as examples or
+-- a README.
+-- Extra-source-files:  
+
+-- Constraint on the version of Cabal needed to build this package.
+Cabal-version:       >=1.10
+
+
+Library
+  Exposed-modules:   
+                     -- commenting out those files that depend on Accelerate
+		     -- Loose all interpreters
+                     Data.Array.Accelerate.BackendKit.ExperimentalPipeline
+                     -- Data.Array.Accelerate.BackendKit.Tests
+                     -- Data.Array.Accelerate.BackendKit.ConsoleTester
+                     -- Data.Array.Accelerate.BackendKit.CompilerPipeline
+                     Data.Array.Accelerate.BackendKit.IRs.GPUIR
+                     --Data.Array.Accelerate.BackendKit.IRs.GPUIR.Interpreter
+                     Data.Array.Accelerate.BackendKit.IRs.CLike
+                     -- Data.Array.Accelerate.BackendKit.IRs.CLike.Interpreter                     
+                     Data.Array.Accelerate.BackendKit.IRs.SimpleAcc
+                     -- Data.Array.Accelerate.BackendKit.IRs.SimpleAcc.Interpreter
+                     Data.Array.Accelerate.BackendKit.IRs.Metadata
+                     Data.Array.Accelerate.BackendKit.SimpleArray
+
+                     Data.Array.Accelerate.BackendKit.Phase1.LiftLets
+                     Data.Array.Accelerate.BackendKit.Phase1.LiftComplexRands
+                     Data.Array.Accelerate.BackendKit.Phase1.RemoveArrayTuple
+                     Data.Array.Accelerate.BackendKit.Phase1.StaticTuples
+                     --  Data.Array.Accelerate.BackendKit.Phase1.ToAccClone
+                     Data.Array.Accelerate.BackendKit.Phase1.VerifySimpleAcc
+                     Data.Array.Accelerate.BackendKit.Phase2.DeadCode
+                     Data.Array.Accelerate.BackendKit.Phase2.DesugarUnit
+                     Data.Array.Accelerate.BackendKit.Phase2.DesugToBackperm
+                     Data.Array.Accelerate.BackendKit.Phase2.DesugToGenerate
+                     Data.Array.Accelerate.BackendKit.Phase2.EstimateCost
+                     Data.Array.Accelerate.BackendKit.Phase2.ExplicitShapes
+                     Data.Array.Accelerate.BackendKit.Phase2.InlineCheap
+                     Data.Array.Accelerate.BackendKit.Phase2.FuseMaps
+                     Data.Array.Accelerate.BackendKit.Phase2.NormalizeExps
+                     Data.Array.Accelerate.BackendKit.Phase2.OneDimensionalize
+                     Data.Array.Accelerate.BackendKit.Phase2.SizeAnalysis
+                     Data.Array.Accelerate.BackendKit.Phase2.ToCLike
+                     Data.Array.Accelerate.BackendKit.Phase2.TrackUses
+                     Data.Array.Accelerate.BackendKit.Phase2.UnzipETups
+                     Data.Array.Accelerate.BackendKit.Phase2.UnzipArrays
+                     Data.Array.Accelerate.BackendKit.Phase3.KernFreeVars
+                     Data.Array.Accelerate.BackendKit.Phase3.FuseGenReduce
+                     Data.Array.Accelerate.BackendKit.Phase3.DesugarGenerate
+                     Data.Array.Accelerate.BackendKit.Phase3.DesugarFoldScan
+                     Data.Array.Accelerate.BackendKit.Phase3.ToGPUIR
+
+                     -- These will move to another package:
+--                     Data.Array.Accelerate.BackendClass
+-- TEMP/FIXME - disabling now for GHC 7.8. but need to fix it: -RRN                     
+--                     Data.Array.Accelerate.DynamicAcc                 
+--                     Data.Array.Accelerate.DynamicAcc2
+
+                     -- Temporarily exposed:
+                     Data.Array.Accelerate.BackendKit.IRs.Internal.AccClone
+                     Data.Array.Accelerate.BackendKit.Utils.Helpers
+  
+  -- Modules not exported by this package:
+  Other-modules:       
+
+  Build-depends:
+                        array           >= 0.3,
+                        mtl,
+                        pretty          >= 1.0 && < 1.2,
+                        prettyclass,
+                        base >= 4, ghc-prim,
+                        containers,
+                     --   accelerate      >= 0.15.0.0,
+                        GenericPretty   >= 1.0,
+                        vector          >= 0.9,
+                        deepseq         >= 1.3,
+                        random          >= 1.0,
+                        time            >= 1.4,
+                        split >= 0.2,
+                        bytestring, primitive,
+                        test-framework, test-framework-hunit, HUnit
+
+  Default-Language:     Haskell2010
+  ghc-options: -threaded 
+
+
+-- commenting out all these since I do not know how badly they
+-- are broken by changes above. 
+
+-- Internal unit tests:
+-- Test-Suite test-accelerate-backend-kit-unittests
+--     type:       exitcode-stdio-1.0
+--     main-is:    UnitTests.hs
+--     hs-source-dirs: tests/ 
+--     ghc-options: -threaded -rtsopts -with-rtsopts=-N
+--     default-language: Haskell2010
+--     build-depends: accelerate-backend-kit
+--     build-depends: base >= 4, containers, ghc-prim,
+--                    array >= 0.3,
+--                    mtl,
+--                    pretty          >= 1.0 && < 1.2,
+--                    accelerate      >= 0.15,
+--                    GenericPretty   >= 1.0,
+--                    deepseq         >= 1.3,
+--                    random          >= 1.0,
+--                    time            >= 1.4,
+--                    test-framework, test-framework-hunit, HUnit,
+--                    split >= 0.2,
+--                    bytestring, primitive
+
+-- "System" tests of the entire backend-kit compiler & interpreter.
+-- Test-Suite test-accelerate-backend-kit-simple-interp
+--     type:       exitcode-stdio-1.0
+--     main-is:    TestSimpleAccInterp.hs
+--     hs-source-dirs: tests/ 
+--     ghc-options: -threaded -rtsopts -with-rtsopts=-N
+--     default-language: Haskell2010
+--     build-depends: accelerate-backend-kit
+--     build-depends: base >= 4, containers, ghc-prim,
+--                    array >= 0.3,
+--                    mtl,
+--                    pretty          >= 1.0 && < 1.2,
+--                    accelerate      >= 0.15,
+--                    GenericPretty   >= 1.0,
+--                    deepseq         >= 1.3,
+--                    random          >= 1.0,
+--                    time            >= 1.4,
+--                    test-framework, test-framework-hunit, HUnit,
+--                    split >= 0.2,
+--                    bytestring, primitive
+
+-- This doesn't really test correctness, because the main accelerate
+-- interpreter IS our reference implementation.  It just makes sure
+-- that all test programs go through without error.
+-- Test-Suite test-accelerate-main-interp
+--     type:       exitcode-stdio-1.0
+--     main-is:    TestInterp.hs
+--     hs-source-dirs: tests/ 
+--     ghc-options: -threaded -rtsopts -with-rtsopts=-N
+--     default-language: Haskell2010
+--     build-depends: accelerate-backend-kit
+--     build-depends: base >= 4, containers, ghc-prim,
+--                    array >= 0.3,
+--                    mtl,
+--                    pretty          >= 1.0 && < 1.2,
+--                    accelerate      >= 0.15,
+--                    GenericPretty   >= 1.0,
+--                    deepseq         >= 1.3,
+--                    random          >= 1.0,
+--                    time            >= 1.4,
+--                    test-framework, test-framework-hunit, HUnit,
+--                    split >= 0.2,
+--                    bytestring, primitive
+
+-- Unit tests for the DynamicAcc2 conversion process.
+-- Test-Suite test-dynamic-acc
+--     type:       exitcode-stdio-1.0
+--     main-is:    TestDynamicAcc.hs
+--     hs-source-dirs: tests/ 
+--     ghc-options: -threaded -rtsopts -with-rtsopts=-N
+--     default-language: Haskell2010
+--     build-depends: accelerate-backend-kit
+--     build-depends: base >= 4, containers, ghc-prim,
+--                    array >= 0.3,
+--                    mtl,
+--                    pretty          >= 1.0 && < 1.2,
+--                    accelerate      >= 0.15,
+--                    GenericPretty   >= 1.0,
+--                    deepseq         >= 1.3,
+--                    random          >= 1.0,
+--                    time            >= 1.4,
+--                    test-framework, 
+--                    test-framework-hunit, 
+--                    test-framework-th, 
+--                    HUnit,          
+--                    split >= 0.2,
+--                    bytestring, primitive
+
+-- Test of up and down conversions 
+-- Test-Suite test-accelerate-backend-kit-liftdrop-interp
+--     type:       exitcode-stdio-1.0
+--     main-is:    TestLiftDrop.hs
+--     hs-source-dirs: tests/ 
+--     ghc-options: -threaded -rtsopts -with-rtsopts=-N
+--     default-language: Haskell2010
+--     build-depends: accelerate-backend-kit
+--     build-depends: base >= 4, containers, ghc-prim,
+--                    array >= 0.3,
+--                    mtl,
+--                    pretty          >= 1.0 && < 1.2,
+--                    accelerate      >= 0.15,
+--                    GenericPretty   >= 1.0,
+--                    deepseq         >= 1.3,
+--                    random          >= 1.0,
+--                    time            >= 1.4,
+--                    test-framework, test-framework-hunit, HUnit,
+--                    split >= 0.2,
+--                    bytestring, primitive
+
