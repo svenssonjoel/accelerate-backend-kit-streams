@@ -5,8 +5,6 @@
 #include <malloc.h>  
 
 // Will lead to double indirection... 
-
-
 // Linked list of nodes.. 
 struct OPNODE { 
   void (*op)(struct OPNODE*, int);   // what to do now

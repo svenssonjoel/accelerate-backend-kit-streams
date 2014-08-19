@@ -14,8 +14,6 @@ import Foreign.C.Types
 
 import Data.Word
 
-
-
 import System.Process
 import Control.Concurrent
 
