@@ -2,12 +2,14 @@
 
 
 
-all: harness.o op1.o
-	gcc harness.o -shared -o harness.so
-	gcc op1.o -shared -o op1.so
+all: harness.so op1.so
 
-harness.o: harness.c 
-	gcc -c -std=c99 -fPIC harness.c -o harness.o
+harness.so: harness.c 
+	gcc -shared -std=c99 -fPIC harness.c -o harness.so
 
-op1.o: op1.c 
-	gcc -c -std=c99 -fPIC op1.c -o op1.o 
+op1.so: op1.c 
+	gcc -shared -std=c99 -fPIC op1.c -o op1.so 
+
+clean: 
+	rm harness.so
+	rm op1.so
