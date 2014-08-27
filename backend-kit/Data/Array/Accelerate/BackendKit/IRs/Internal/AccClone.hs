@@ -79,7 +79,7 @@ data AExp a =
   | Reshape     a Exp      (AExp a)   
   | Stencil     a (Fun1 Exp) Boundary (AExp a)
   | Stencil2    a (Fun2 Exp) Boundary (AExp a) Boundary (AExp a) 
- deriving (Read,Show,Eq,Generic)
+ deriving (Read,Show,Eq,Ord,Generic)
 
 --------------------------------------------------------------------------------
 -- Scalar Expressions 
@@ -107,7 +107,7 @@ data Exp =
   | EIndexScalar (AExp Type) Exp 
   | EShape (AExp Type)
   | EShapeSize Exp 
- deriving (Read,Show,Eq,Generic)
+ deriving (Read,Show,Eq,Ord,Generic)
 
 --------------------------------------------------------------------------------
 
