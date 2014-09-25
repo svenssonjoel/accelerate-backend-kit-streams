@@ -29,6 +29,9 @@ import Data.Syntactic.Functional
 import Data.Syntactic.Sugar.BindingT
 
 
+import Data.Supply
+import System.IO.Unsafe
+
 
 --------------------------------------------------------------------------------
 -- * Types
@@ -230,13 +233,13 @@ share = sugarSym Let
 -- * Example 
 --------------------------------------------------------------------------------
 
+ex1 :: Data (Stream Int) 
 ex1 = sscan (+) 0 (smap (+1) source)
 
-
+ex2 :: Data (Stream Int) 
 ex2 = share source $ \a -> let b = smap (+1) a
                                c = smap (+1) a
                            in sZipWith (+) b c 
-
 
 
 
@@ -245,5 +248,133 @@ ex2 = share source $ \a -> let b = smap (+1) a
 -- * Analysis and graph construction
 ---------------------------------------------------------------------------
 
+getTree :: (Syntactic a, StringTree (Domain a)) => a -> Tree String
+getTree = stringTree . desugar 
 
 
+
+
+---------------------------------------------------------------------------
+-- Compile 
+--------------------------------------------------------------------------- 
+
+compileAST :: (Syntactic a, Domain a ~ Lang) => a -> String
+compileAST = doIt . desugar
+  where doIt = undefined 
+          
+
+-- Phase1 compiled AST into a Graph representation
+-- list of nodes identified by a key and a list of in-edges to that node
+
+type GraphRep node = [(node, Integer, [Integer])]
+
+findNode :: GraphRep node -> Integer -> Maybe (node, [Integer])
+findNode [] _ = Nothing
+findNode ((n,i,args):xs) key | key Prelude.== i = Just (n,args)
+                             | otherwise = findNode xs key
+
+removeNode :: GraphRep node -> Integer -> GraphRep node
+removeNode [] _ = []
+removeNode (a@(_,i,_):xs) key | key Prelude.== i = xs
+                              | otherwise = a : removeNode xs key 
+
+
+collect1 :: Eq node => GraphRep node -> node -> [Integer]
+collect1 [] _ = []
+collect1 ((n,i,_):xs) node | n Prelude.== node = i : collect1 xs node
+                           | otherwise = collect1 xs node
+
+repoint :: Eq node => GraphRep node -> [Integer] -> Integer -> GraphRep node 
+repoint [] _ _ = [] 
+repoint ((n,i,args):xs) candidate newval = (n,i,rename args):repoint xs candidate newval
+  where
+    rename [] = []
+    rename (x:xs) = if any (Prelude.==x) candidate
+                    then newval : rename xs
+                    else x : rename xs 
+  
+
+class Render sym => Phase1 sym where
+  -- update a GraphRep with a symbol 
+  phase1Sym :: Supply Integer
+               -> GraphRep String
+               -> [Integer]
+               -> sym a
+               -> (Integer, GraphRep String)
+
+  phase1Sym s gacc args sym = (v, new : gacc) 
+    where
+      new = (renderSym sym, v, args) 
+      v =  supplyValue s 
+
+instance (Phase1 sym1, Phase1 sym2) => Phase1 (sym1 :+: sym2) where
+  phase1Sym s g args (InjL sym) = phase1Sym s g args sym
+  phase1Sym s g args (InjR sym) = phase1Sym s g args sym
+
+-- instance StringTree Let
+--   where
+--     stringTreeSym [a, Node lam [body]] Let
+--         | ("Lam",v) <- splitAt 3 lam = Node ("Let" ++ v) [a,body]
+--     stringTreeSym [a,f] Let = Node "Let" [a,f]
+
+instance Phase1 Let where
+  -- let is implemented using Lam .. (It seems)
+
+  phase1Sym s gacc [a,body] Let =
+    case findNode gacc body of
+      Just (nodeString,[realBody]) ->
+        case splitAt 3 nodeString of
+-----------------------------------------------------------
+          ("Lam", variableToReplace) ->
+            let refs = collect1 gacc (drop 1 variableToReplace)
+                newGraph = repoint gacc refs a 
+            in -- (v, ("Let", v, [a,realBody]): removeNode newGraph body)
+             (realBody, removeNode newGraph body)
+          -- Can this really happen ?  ( I suspect not) 
+          (_,_) -> (v, ("Let", v, [a,body]): gacc)
+      Nothing -> error "found Nothing"
+    where
+      v = supplyValue s
+ -- phase1Sym s gacc args Let = (v, ("let", v, args): gacc)
+ --   where
+ --     v = supplyValue s
+
+instance Phase1 BindingT
+instance Phase1 Construct
+instance Phase1 StreamOp
+instance Phase1 Arithmetic
+
+
+instance Phase1 Empty
+
+
+
+-- Convert a AST to a Graph 
+phase1 :: forall sym a . Phase1 sym => Supply Integer -> ASTF sym a -> (Integer, GraphRep String)
+phase1 s = go s emptyGraph emptyArgs 
+  where
+    --  Convert a symbol to a 'Graph'
+    go :: Supply Integer -> GraphRep String -> [Integer] -> AST sym sig -> (Integer,GraphRep String)
+    go s gacc args (Sym sym) =  phase1Sym s gacc args sym
+    go s gacc args (sym :$ a) = go s2 (g++gacc) (t:args) sym 
+      where
+        (s1,s2) = split2 s 
+        (t, g) = phase1 s1 a 
+      
+      
+      
+    emptyGraph = []
+    emptyArgs = [] 
+
+
+---------------------------------------------------------------------------
+-- Utilities 
+---------------------------------------------------------------------------
+mySupply :: Supply Integer
+mySupply = unsafePerformIO $ newEnumSupply 
+
+---------------------------------------------------------------------------
+-- MAIN MAIN MAIN  
+---------------------------------------------------------------------------
+
+main = putStrLn "Hello World"

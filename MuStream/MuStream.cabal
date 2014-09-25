@@ -61,6 +61,7 @@ executable MuStream
                , mtl >=2.2 && <2.3
                , containers >=0.5 && <0.6
                , syntactic >= 2.0 && < 2.1
+               , value-supply >= 0.5 && < 0.6
   
   -- Directories containing source files.
   -- hs-source-dirs:      
