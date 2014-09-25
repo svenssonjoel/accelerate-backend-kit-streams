@@ -292,8 +292,25 @@ repoint ((n,i,args):xs) candidate newval = (n,i,rename args):repoint xs candidat
     rename (x:xs) = if any (Prelude.==x) candidate
                     then newval : rename xs
                     else x : rename xs 
-  
 
+---------------------------------------------------------------------------
+-- Intermediate Code
+---------------------------------------------------------------------------
+
+-- node types                           
+data Node = NSZipWith
+          | NSMap
+          | NLam String
+          | NVar String
+          | NSource 
+          
+class ToNode sym where
+  toNode :: sym -> Node 
+
+
+---------------------------------------------------------------------------
+-- Compile program to a graph 
+---------------------------------------------------------------------------
 class Render sym => Phase1 sym where
   -- update a GraphRep with a symbol 
   phase1Sym :: Supply Integer
@@ -360,8 +377,6 @@ phase1 s = go s emptyGraph emptyArgs
       where
         (s1,s2) = split2 s 
         (t, g) = phase1 s1 a 
-      
-      
       
     emptyGraph = []
     emptyArgs = [] 
