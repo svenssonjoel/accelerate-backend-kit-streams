@@ -300,28 +300,62 @@ repoint ((n,i,args):xs) candidate newval = (n,i,rename args):repoint xs candidat
 -- node types                           
 data Node = NSZipWith
           | NSMap
+          | NSScan 
           | NLam String
           | NVar String
-          | NSource 
+          | NSource
+            -- Arithmetic
+          | NAdd
+          | NSub
+          | NMul
+          | NConst String 
+          deriving (Eq, Ord, Show, Read) 
           
 class ToNode sym where
-  toNode :: sym -> Node 
+  toNodeSym :: sym sig -> Node 
+
+instance (ToNode sym1, ToNode sym2) => ToNode (sym1 :+: sym2) where
+  toNodeSym (InjL s) = toNodeSym s
+  toNodeSym (InjR s) = toNodeSym s
+
+instance ToNode Arithmetic where
+  toNodeSym Add = NAdd
+  toNodeSym Sub = NSub
+  toNodeSym Mul = NMul
+
+instance ToNode StreamOp where
+  toNodeSym Source = NSource
+  toNodeSym SMap   = NSMap
+  toNodeSym SScan  = NSScan
+  toNodeSym SZipWith = NSZipWith
+
+instance ToNode BindingT where
+  toNodeSym (VarT n) =  NVar $ "v" ++ show n
+  toNodeSym (LamT n) =  NLam $ "v" ++ show n 
+
+instance ToNode Let where -- dummy 
+  toNodeSym _ = error "why!?"
+
+instance ToNode Empty where 
+  toNodeSym _ = error "Empty: Why!?" 
+instance ToNode Construct where
+  toNodeSym (Construct n _)  = NConst  n 
 
 
 ---------------------------------------------------------------------------
 -- Compile program to a graph 
 ---------------------------------------------------------------------------
-class Render sym => Phase1 sym where
+class ToNode sym => Phase1 sym where
   -- update a GraphRep with a symbol 
   phase1Sym :: Supply Integer
-               -> GraphRep String
+               -> GraphRep Node
                -> [Integer]
                -> sym a
-               -> (Integer, GraphRep String)
+               -> (Integer, GraphRep Node)
 
   phase1Sym s gacc args sym = (v, new : gacc) 
     where
-      new = (renderSym sym, v, args) 
+      new = (toNodeSym sym, v, args) 
       v =  supplyValue s 
 
 instance (Phase1 sym1, Phase1 sym2) => Phase1 (sym1 :+: sym2) where
@@ -339,16 +373,15 @@ instance Phase1 Let where
 
   phase1Sym s gacc [a,body] Let =
     case findNode gacc body of
-      Just (nodeString,[realBody]) ->
-        case splitAt 3 nodeString of
------------------------------------------------------------
-          ("Lam", variableToReplace) ->
-            let refs = collect1 gacc (drop 1 variableToReplace)
+      Just (NLam variableToReplace,[realBody]) ->
+       -- case splitAt 3 nodeString of
+       --    ("Lam", variableToReplace) ->
+            let refs = collect1 gacc (NVar variableToReplace)
                 newGraph = repoint gacc refs a 
             in -- (v, ("Let", v, [a,realBody]): removeNode newGraph body)
              (realBody, removeNode newGraph body)
           -- Can this really happen ?  ( I suspect not) 
-          (_,_) -> (v, ("Let", v, [a,body]): gacc)
+      Just (_,_) -> error "Should not happen" -- (v, ("Let", v, [a,body]): gacc)
       Nothing -> error "found Nothing"
     where
       v = supplyValue s
@@ -367,11 +400,11 @@ instance Phase1 Empty
 
 
 -- Convert a AST to a Graph 
-phase1 :: forall sym a . Phase1 sym => Supply Integer -> ASTF sym a -> (Integer, GraphRep String)
+phase1 :: forall sym a . Phase1 sym => Supply Integer -> ASTF sym a -> (Integer, GraphRep Node)
 phase1 s = go s emptyGraph emptyArgs 
   where
     --  Convert a symbol to a 'Graph'
-    go :: Supply Integer -> GraphRep String -> [Integer] -> AST sym sig -> (Integer,GraphRep String)
+    go :: Supply Integer -> GraphRep Node -> [Integer] -> AST sym sig -> (Integer,GraphRep Node)
     go s gacc args (Sym sym) =  phase1Sym s gacc args sym
     go s gacc args (sym :$ a) = go s2 (g++gacc) (t:args) sym 
       where
