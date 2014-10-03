@@ -108,7 +108,10 @@
 	                                      // result type of op
 					      // through this tailcall
      --------------
-	     
+
+
+     * Potential Issues: 
+       + Portability concerns (Pointer sizes and alignments	     
      
 ---------------------------------------------------------------------------
 -- RTS Thoughts 
