@@ -32,6 +32,8 @@ import Data.Syntactic.Sugar.BindingT
 import Data.Supply
 import System.IO.Unsafe
 
+import Data.Map as M 
+
 
 --------------------------------------------------------------------------------
 -- * Types
@@ -71,7 +73,25 @@ instance Eval Arithmetic where
 instance EvalEnv Arithmetic env where
   compileSym p Add = compileSymDefault p Add
   compileSym p Sub = compileSymDefault p Sub
-  compileSym p Mul = compileSymDefault p Mul 
+  compileSym p Mul = compileSymDefault p Mul
+
+--------------------------------------------------------------------------------
+-- * Allow Tuples 
+--------------------------------------------------------------------------------
+data Tuple a where
+  Tup2 :: (Type a, Type b) => Tuple (a :-> b :-> Full (a, b))
+
+instance Render Tuple where
+  renderSym Tup2 = "Tup2"
+  renderArgs = renderArgsSmart
+
+interpretationInstances ''Tuple
+
+instance Eval Tuple where
+  evalSym Tup2 = (,) 
+
+instance EvalEnv Tuple env where
+  compileSym p Tup2 = compileSymDefault p Tup2 
 
 --------------------------------------------------------------------------------
 -- * Allow let bindings
@@ -148,7 +168,7 @@ instance EvalEnv StreamOp env where
 -- * Domain
 --------------------------------------------------------------------------------
 
-type Lang = Arithmetic :+: StreamOp :+: Construct :+: BindingT :+: Let
+type Lang = Arithmetic :+: StreamOp :+: Construct :+: BindingT :+: Let :+: Tuple
 
 
 newtype Data a = Data { unData :: ASTF Lang a}
@@ -197,6 +217,7 @@ eval :: (Syntactic a, Domain a ~ Lang) => a -> Internal a
 eval = evalClosed . desugar
 
 
+
 --------------------------------------------------------------------------------
 -- * Front end
 --------------------------------------------------------------------------------
@@ -204,6 +225,9 @@ eval = evalClosed . desugar
 
 source :: Data (Stream Int) 
 source = sugarSym Source
+
+mkTup :: (Type a, Type b) => Data a -> Data b -> Data (a, b)
+mkTup = sugarSym $ Tup2 
 
 smap :: (Type a, Type b) =>  (Data a -> Data b) -> Data (Stream a) -> Data (Stream b) 
 smap = sugarSym SMap 
@@ -241,8 +265,12 @@ ex2 = share source $ \a -> let b = smap (+1) a
                                c = smap (+1) a
                            in sZipWith (+) b c 
 
+ex3 :: Data (Stream Int)
+ex3 = smap (\x -> share x $ \i -> i + i) source 
 
 
+ex4 :: Data (Stream Int, Stream Int)
+ex4 = mkTup ex2  ex1
 
 ---------------------------------------------------------------------------
 -- * Analysis and graph construction
@@ -262,7 +290,6 @@ compileAST :: (Syntactic a, Domain a ~ Lang) => a -> String
 compileAST = doIt . desugar
   where doIt = undefined 
           
-
 -- Phase1 compiled AST into a Graph representation
 -- list of nodes identified by a key and a list of in-edges to that node
 
@@ -275,7 +302,7 @@ findNode ((n,i,args):xs) key | key Prelude.== i = Just (n,args)
 
 removeNode :: GraphRep node -> Integer -> GraphRep node
 removeNode [] _ = []
-removeNode (a@(_,i,_):xs) key | key Prelude.== i = xs
+removeNode (a@(_,i,_):xs) key | key Prelude.== i = removeNode xs key
                               | otherwise = a : removeNode xs key 
 
 
@@ -298,9 +325,9 @@ repoint ((n,i,args):xs) candidate newval = (n,i,rename args):repoint xs candidat
 ---------------------------------------------------------------------------
 
 -- node types                           
-data Node = NSZipWith
-          | NSMap
-          | NSScan 
+data Node = NSZipWith --Fun2   
+          | NSMap     --Fun1    
+          | NSScan    --Fun2    
           | NLam String
           | NVar String
           | NSource
@@ -308,9 +335,12 @@ data Node = NSZipWith
           | NAdd
           | NSub
           | NMul
-          | NConst String 
+          | NConst String
+            -- Tuple
+          | NTup 
           deriving (Eq, Ord, Show, Read) 
-          
+
+         
 class ToNode sym where
   toNodeSym :: sym sig -> Node 
 
@@ -331,7 +361,10 @@ instance ToNode StreamOp where
 
 instance ToNode BindingT where
   toNodeSym (VarT n) =  NVar $ "v" ++ show n
-  toNodeSym (LamT n) =  NLam $ "v" ++ show n 
+  toNodeSym (LamT n) =  NLam $ "v" ++ show n
+
+instance ToNode Tuple where
+  toNodeSym (Tup2) = NTup
 
 instance ToNode Let where -- dummy 
   toNodeSym _ = error "why!?"
@@ -393,6 +426,7 @@ instance Phase1 BindingT
 instance Phase1 Construct
 instance Phase1 StreamOp
 instance Phase1 Arithmetic
+instance Phase1 Tuple 
 
 
 instance Phase1 Empty
@@ -416,6 +450,77 @@ phase1 s = go s emptyGraph emptyArgs
 
 
 ---------------------------------------------------------------------------
+-- Compilation of Graph to collection of C functions
+---------------------------------------------------------------------------
+
+data CompilationUnit = CFunction String
+                     | CSkel -- Skeleton [Integer] 
+                     | Internal
+                       deriving (Eq,Ord, Show) 
+
+type CompilerResult = M.Map Integer CompilationUnit 
+
+compileGraph :: (Integer, GraphRep Node) -> CompilerResult 
+compileGraph (out,graph) = compileNode M.empty graph out 
+
+compileNode map graph node =
+  case findNode graph node of
+
+    Just (NSZipWith, [f,s1,s2]) -> let map' = compileLamTop map graph f
+                                       map'' = compileNode map' graph s1
+                                   in compileNode map'' graph s2
+
+    Just (NSMap,     [f,s]) -> let map' = compileLamTop  map graph f
+                               in  compileNode map' graph s
+
+    Just (NSScan,    [f,s]) -> let map' = compileLamTop map graph f
+                               in compileNode map' graph s
+
+    Just (NSource,   []) -> map
+    Just _  -> map
+    Nothing -> error "compileNode: broken graph" 
+    -- Just lam@(NLam var, [body]) -> compileLamTop map graph lam
+    -- Just (NAdd, [a,b]) ->  
+
+compileLamTop map graph nid = map'
+  where
+    c_args = collectArgs nid 
+    body_nid = findBody nid 
+
+    head = "int fun" ++ show nid ++ "(" ++ mkArgsList c_args ++")"
+    c_body = compileLamBody graph body_nid 
+    c_code = CFunction $ head ++ "{\nreturn " ++ c_body ++ ";\n}" 
+
+    map' = M.insert nid c_code map 
+    
+    collectArgs nid  =
+       case findNode graph nid of
+         Just (NLam var, [body]) -> var : collectArgs body
+         Just x -> []
+         Nothing -> error "CompileLamTop: broken graph"
+
+    findBody nid =
+      case findNode graph nid of
+        Just (NLam var, [body]) -> findBody body
+        Just x -> nid
+        Nothing -> error "collectLamTop: broken graph" 
+                                 
+    mkArgsList [] = ""
+    mkArgsList [x] = "int " ++ x
+    mkArgsList (x:xs) = "int " ++ x ++ ", " ++ mkArgsList xs 
+        
+compileLamBody :: GraphRep Node -> Integer -> String 
+compileLamBody graph nid =
+  case findNode graph nid of
+    Just (NAdd, [a,b]) -> compileLamBody graph a ++ " + " ++ compileLamBody graph b
+    Just (NSub, [a,b]) -> compileLamBody graph a ++ " - " ++ compileLamBody graph b
+    Just (NMul, [a,b]) -> compileLamBody graph a ++ " * " ++ compileLamBody graph b
+    Just (NConst s, []) -> s
+    Just (NVar s, []) -> s 
+    Just _  -> error "compileLamBody: unhandled case"
+    Nothing -> error "compileLamBody: Broken graph" 
+
+---------------------------------------------------------------------------
 -- Utilities 
 ---------------------------------------------------------------------------
 mySupply :: Supply Integer
@@ -425,4 +530,26 @@ mySupply = unsafePerformIO $ newEnumSupply
 -- MAIN MAIN MAIN  
 ---------------------------------------------------------------------------
 
-main = putStrLn "Hello World"
+main = putStrLn $ show $ phase1 mySupply $ desugar ex3
+
+
+
+
+
+
+
+---------------------------------------------------------------------------
+-- Install plan
+
+data Dest = NewCode --FunPtr
+          | BlackHole
+          | Blocker
+
+data Action = Repoint -- dest
+            | CreateOp -- FunPtr 
+
+
+--             | LoadSO  -- haskell will load the so 
+
+
+type 

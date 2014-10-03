@@ -12,6 +12,14 @@ struct OPNODE {
 }; 
 
 
+struct OPNODE_STATEFUL { 
+  State *MyState;
+  void (*op)(struct OPNODE*, int);   // what to do now
+  struct OPNODE *cont;               // what to do next
+}; 
+
+
+
 
 #define runOp(opNode,a) (opNode)->op((opNode),a)   
 

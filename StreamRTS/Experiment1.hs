@@ -17,6 +17,8 @@ import Data.Word
 import System.Process
 import Control.Concurrent
 
+-- import Graphics.UI.WX 
+
 {-
   RTLD FLAGS
 

@@ -1,0 +1,110 @@
+
+
+
+* Benchmark: 
+  Batching and fusion. 
+  Adaptation.          
+
+  + Literature, does any system do batching/fusion. 
+    - Read InfoSphere streams 
+    - TwitterStorm 
+    - RX 
+
+
+
+
+ * Arbitrary mutation or subtrees (structured graphs). 
+
+
+
+ * source 
+ * smap 
+ * sscan     / iterate (stateful or stateless) 
+ * szipwith  / merge 
+ * # filter 
+ * # merge  (nondeterministic) 
+ * # NetIn / NetOut 
+  
+
+ * runtime 
+
+
+ * Lost some of my notes here because of clumsiness 
+
+---------------------------------------------------------------------------
+-- API Thoughts 
+--------------------------------------------------------------------------- 
+
+ * Low Level (C Library) 
+   + CreateOpNode args  
+   + Connect / Reconnect (repoint) 
+   + AddListener (cons to a nodes out "list")    
+
+   + Built in nodes 
+     + Blocker 
+     + Blackhole 
+
+   + Thoughts: 
+     The Low Level API may potentially also consist of parts 
+     that are generated and loaded on-the-fly. 
+     + Why? 
+       An update to the graph may introduce a node with entirely new 
+       input / output types compared to any launched before. 
+       This means a new Struct OPNODE_tin_tout needs to be generated 
+       and compiled into the executing program. 
+       I think it is unreasonable that the Low Level C library should 
+       have "prototype" node structs available for all possible cases. 
+       And I think that, even c, wont allow arbitrary "casting" of for 
+       example void * into  void (*fun)(t1, t2, t3)  
+       
+       + Alternatives ? (Dont know just yet)  
+      
+     
+ * Runtime System Higher Level (Haskell Library) 
+   + Has Complete view of original Program Graph 
+   + Has Complete view of optimized "actual" Graph (after fusion/batching) 
+   
+   + Install Plans 
+     - Set of actions to perform on the executing graph 
+
+   + Compile 
+   + LoadSO 
+   
+   + If the Low Level C API is "dynamic" as suggested above. Then 
+     this library should be able to compile and link in "patches" 
+     to the Low Level runtime system. 
+
+     Current experimental OPNODE type: 
+     --- C Code ---   
+       struct OPNODE { 
+         void (*op)(struct OPNODE*, int);   // what to do now
+         struct OPNODE *cont;               // what to do next 
+       }; 
+     --------------
+     is limited to representing nodes that accept an int as argument 
+     
+     -Int-> Op -Int-> 
+
+     So if a new node taking and produces floats is introduced into the 
+     graph, this OPNODE struct cannot represent that operation. 
+  
+     Desired: A generic Base OPNODE Struct. 
+              Ways to generate "subtypes" of that base OPNODE. 
+	      Can we cast from the "base" to any variant safely ? 
+     --- C Code --- 
+     struct BASE_OPNODE { 
+        // No actual function here (something that takes up same amount of space)	
+	char placeholder[8];  // necessary ? 
+	// a list/tree of nodes to pass result onwards too
+	struct BaseOpNodeList *continuations; 
+     }	
+     
+     // Operation accepting an int
+     struct OPNODE_Int {
+     	void (*op)(BASE_OPNODE *this, int); // what to do now 
+	struct BaseOpNodeList *continuations; // continuations accepting 
+	                                      // result type of op
+					      // through this tailcall
+     --------------
+	     
+      
