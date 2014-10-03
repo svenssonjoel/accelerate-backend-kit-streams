@@ -16,7 +16,7 @@
  * Arbitrary mutation or subtrees (structured graphs). 
 
 
-
+ Current set of ops (ops to add #) 
  * source 
  * smap 
  * sscan     / iterate (stateful or stateless) 
@@ -24,7 +24,7 @@
  * # filter 
  * # merge  (nondeterministic) 
  * # NetIn / NetOut 
-  
+    
 
  * runtime 
 
@@ -38,7 +38,9 @@
  * Low Level (C Library) 
    + CreateOpNode args  
    + Connect / Reconnect (repoint) 
-   + AddListener (cons to a nodes out "list")    
+   + AddListener (cons to a nodes out "list") 
+   + DeleteOpNode (that is entirely disconnected, 
+                   no in arrow. and outarrow pointing to -> blocker)   
 
    + Built in nodes 
      + Blocker 
@@ -107,4 +109,10 @@
 					      // through this tailcall
      --------------
 	     
-      
+     
+---------------------------------------------------------------------------
+-- RTS Thoughts 
+--------------------------------------------------------------------------- 
+  
+ * Memory allocation / deallocation 
+ * ... 
