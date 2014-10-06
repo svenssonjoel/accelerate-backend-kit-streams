@@ -30,6 +30,36 @@
 
 
  * Lost some of my notes here because of clumsiness 
+---------------------------------------------------------------------------
+-- ZipWith Thoughts 
+--------------------------------------------------------------------------- 
+  ZipWith is a node that accepts data from two streams. This type 
+  of node cannot be implemented as a tail call from any other node. 
+
+  * ZipWith can run in a thread of its own, polling on two buffers and executing 
+    once data is available. 
+
+  * Alternatives ?
+
+
+---------------------------------------------------------------------------
+-- About sources and Nodes 
+--------------------------------------------------------------------------- 
+ 
+   * Sources, how to implement. 
+      
+     + a source as a standalone thread pushing data into a buffer, 
+       alternatively calling a fptr with. 
+
+     + a source as a function that is called by some controlling program 
+       ruitinely. Source writes to buffer, or calls a fptr. 
+       
+     + How can a source be made to slow down ? 
+       - options .. ? 
+
+       	      
+     
+ 
 
 ---------------------------------------------------------------------------
 -- API Thoughts 
@@ -119,3 +149,28 @@
   
  * Memory allocation / deallocation 
  * ... 
+
+
+---------------------------------------------------------------------------
+-- Backoff, backpreasure, 
+--------------------------------------------------------------------------- 
+ There needs to be a metod to send messages backwards, requesting that 
+ an earlier node slows down its pushrate. 
+   * In the case of a tailcall fptr chain I imagine this propagates all the
+     way to the "source" and requests that it slows down. 
+      
+     I imagine this will pop up as soon as there are things such as zipwith 
+     that reads from buffers. 
+     Say that one of the zipwith input buffers are filling up. Now a message 
+     must be sent to the source that is filling that buffer to slow down. 
+
+
+
+---------------------------------------------------------------------------
+-- Desired Properties 
+--------------------------------------------------------------------------- 
+  
+  * Adding a listener to a stream should not cause loss of data for	
+    other listeners of that stream. 
+
+  
